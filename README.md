@@ -34,8 +34,8 @@ flutter pub get
 ```
 ### 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/santhoshm0731-ui/weather-app-using-flutter.git
+cd weather-app-using-flutter
 ```
 
 
