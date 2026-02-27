@@ -23,7 +23,12 @@ int humidity=0;
 double air=0;
 int pressure=0;
 bool _isLoading=true;
+bool _isFetching=false;
 String currentState=" ";
+String currentCity="London";
+TextEditingController _cityController= TextEditingController();
+
+
   @override
   void initState(){
     super.initState();
@@ -31,33 +36,55 @@ String currentState=" ";
   }
 
 Future getCurrentWeather() async{
+  if (_isFetching) return;
 
-  String city='London';
+  String city=_cityController.text.isEmpty
+         ?"London"
+        :_cityController.text;
   String apiKey = dotenv.env['Api_key'] ?? '';
+
+  _isFetching = true;
   try{
    
-  final result= await http.get(Uri.parse("https://api.openweathermap.org/data/2.5/weather?q=$city,uk&APPID=$apiKey"));
+  final result= await http.get(Uri.parse("https://api.openweathermap.org/data/2.5/weather?q=$city&APPID=$apiKey"));
   final data= jsonDecode(result.body);
   if (data['cod']!=200){
-    throw "Unexpected Error Occured";   
+    setState(() {
+      _isLoading=false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Unable to load data")));
+    _isFetching = false;
+    return;
   }
 
   setState(() {
+    currentCity=city;
     temp=data['main']['temp'];
     humidity=data['main']['humidity'];
     pressure=data['main']['pressure'];
     air=data['wind']['speed'];
     currentState=data['weather'][0]['main'];
-    
     _isLoading=false;
   });
-  
+  _isFetching = false;
+ 
   
   }catch (e){
-    throw e.toString();
+    setState(() {
+      _isLoading=false;
+    });
+     ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Failed to load weather")),
+     );
+     _isFetching = false;
   }
 
 }
+ 
+   void dispose(){
+    _cityController.dispose();
+    super.dispose();
+   }
 
 
   @override
@@ -68,12 +95,11 @@ Future getCurrentWeather() async{
                      ),
                     centerTitle: true,
                     actions: [IconButton(onPressed: (){
-                     
+
                       setState(() {
-                        _isLoading=true; 
+                        _isLoading=true;
                       });
                       getCurrentWeather();
-                      debugPrint("???????????");
                     },
                      icon: Icon(Icons.refresh,color: Colors.white,))],
                      
@@ -91,7 +117,12 @@ Future getCurrentWeather() async{
                           SizedBox(width: double.infinity,
                           height: 30,
                           child: 
-                             TextField(decoration: InputDecoration(
+                             TextField(
+                              controller: _cityController,
+                              onSubmitted: (_) {
+                                getCurrentWeather();
+                              },
+                              decoration: InputDecoration(
                               contentPadding: EdgeInsets.all(5),
                               hintText: "Search Place or City(Eg. London)",
                               prefixIcon: Icon(Icons.search),
@@ -100,6 +131,7 @@ Future getCurrentWeather() async{
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),borderSide: BorderSide.none)
                               
                             ),),
+                            
                           ),
                           SizedBox(
                             width: double.infinity,
@@ -108,6 +140,7 @@ Future getCurrentWeather() async{
                               elevation: 10,
                               child: Column(
                                 children: [
+                                  Text(currentCity,style: TextStyle(fontSize: 25,fontWeight: FontWeight.bold),),
                                   SizedBox(height: 15),
                                   Text("$temp K",style: TextStyle(
                                      fontSize: 25,fontWeight: FontWeight.bold
@@ -177,4 +210,5 @@ Future getCurrentWeather() async{
                  ),
                   );
    }
+  
 }
