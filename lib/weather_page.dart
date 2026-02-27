@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:weather_app/additinal_info.dart';
+import 'package:weather_app/theme_provider.dart';
 import 'package:weather_app/weather_forecast.dart';
 
 
@@ -25,27 +28,39 @@ int pressure=0;
 bool _isLoading=true;
 bool _isFetching=false;
 String currentState=" ";
-String currentCity="London";
+String currentCity="London"; // Default fallback
+String _lastSearchedCity="London"; // Stored city
 TextEditingController _cityController= TextEditingController();
 
 
   @override
   void initState(){
     super.initState();
-   getCurrentWeather();
+    _loadLastSearchedCity();
+  }
+
+  Future<void> _loadLastSearchedCity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastCity = prefs.getString('last_searched_city') ?? 'London';
+    setState(() {
+      _lastSearchedCity = lastCity;
+      currentCity = lastCity;
+      _cityController.text = lastCity;
+    });
+    getCurrentWeather();
   }
 
 Future getCurrentWeather() async{
   if (_isFetching) return;
 
   String city=_cityController.text.isEmpty
-         ?"London"
+         ?_lastSearchedCity
         :_cityController.text;
   String apiKey = dotenv.env['Api_key'] ?? '';
 
   _isFetching = true;
   try{
-   
+
   final result= await http.get(Uri.parse("https://api.openweathermap.org/data/2.5/weather?q=$city&APPID=$apiKey"));
   final data= jsonDecode(result.body);
   if (data['cod']!=200){
@@ -56,6 +71,9 @@ Future getCurrentWeather() async{
     _isFetching = false;
     return;
   }
+
+  // Save the successful city search
+  await _saveLastSearchedCity(city);
 
   setState(() {
     currentCity=city;
@@ -80,7 +98,15 @@ Future getCurrentWeather() async{
   }
 
 }
- 
+
+Future<void> _saveLastSearchedCity(String city) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('last_searched_city', city);
+  setState(() {
+    _lastSearchedCity = city;
+  });
+}
+
    void dispose(){
     _cityController.dispose();
     super.dispose();
@@ -91,18 +117,30 @@ Future getCurrentWeather() async{
   Widget build(BuildContext context) {
     return Scaffold(
     appBar: AppBar(title: Text("Weather APP",
-            style: TextStyle(fontWeight: FontWeight.bold,fontSize: 30,color: Colors.white),
+            style: TextStyle(fontWeight: FontWeight.bold,fontSize: 30),
                      ),
                     centerTitle: true,
-                    actions: [IconButton(onPressed: (){
+                    actions: [
+                      Consumer<ThemeProvider>(
+                        builder: (context, themeProvider, child) {
+                          return IconButton(
+                            onPressed: () {
+                              themeProvider.toggleTheme();
+                            },
+                            icon: Icon(
+                              themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                            ),
+                          );
+                        },
+                      ),
+                      IconButton(onPressed: (){
 
                       setState(() {
                         _isLoading=true;
                       });
                       getCurrentWeather();
                     },
-                     icon: Icon(Icons.refresh,color: Colors.white,))],
-                     
+                     icon: Icon(Icons.refresh,))],
                  ),
                  body: _isLoading
                  ? Center(
@@ -127,16 +165,16 @@ Future getCurrentWeather() async{
                               hintText: "Search Place or City(Eg. London)",
                               prefixIcon: Icon(Icons.search),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Theme.of(context).cardColor,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),borderSide: BorderSide.none)
-                              
+
                             ),),
                             
                           ),
                           SizedBox(
                             width: double.infinity,
                             child: Card(
-                              shape:RoundedRectangleBorder(side: BorderSide.none,borderRadius: BorderRadiusGeometry.circular(15)),
+                              shape:RoundedRectangleBorder(side: BorderSide.none,borderRadius: BorderRadius.circular(15)),
                               elevation: 10,
                               child: Column(
                                 children: [
